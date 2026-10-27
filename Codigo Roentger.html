@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Código Roentgen · Escape de Bioimágenes</title>
+<style>
+:root{--bg:#070d14;--film:#0f1d2b;--line:#27445c;--ink:#e8f3fb;--mute:#8fa8bb;--ice:#9fe3ff;--amb:#ffb84d;--ok:#7be0ae;--bad:#ff8a80;box-sizing:border-box;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;background:radial-gradient(ellipse at 50% -10%,#143049 0,var(--bg) 60%);overflow-x:hidden}
+main{max-width:640px;margin:0 auto;padding:16px 16px 48px}
+h1,h2{font-family:Georgia,"Times New Roman",serif;font-weight:700;line-height:1.15;margin:0 0 8px}
+h1{font-size:2.2rem}h2{font-size:1.45rem}
+p{margin:0 0 12px}
+.hud{display:flex;justify-content:space-between;color:var(--mute);font-size:.95rem;margin-bottom:8px}
+.bar{height:6px;background:var(--film);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ice);transition:width .5s}
+.slots{display:flex;gap:8px;margin:12px 0}
+.slots b{flex:1;text-align:center;padding:8px 0;border:1px solid var(--line);border-radius:8px;font:700 1.4rem Georgia,serif;color:var(--mute)}
+.slots b.on{color:var(--amb);border-color:var(--amb);background:#2a1d08}
+.card{background:var(--film);border:1px solid var(--line);border-radius:14px;padding:20px}
+.obj{color:var(--ice);font-size:.95rem;margin-bottom:12px}
+button,select{font:inherit;color:var(--ink)}
+.btn{background:var(--ice);color:#04141f;border:0;border-radius:10px;padding:12px 20px;font-weight:700;cursor:pointer;margin:6px 8px 0 0;text-decoration:none;display:inline-block}
+.btn.ghost{background:none;color:var(--ice);border:1px solid var(--line)}
+button:focus-visible,select:focus-visible,a:focus-visible,[data-e]:focus-visible{outline:3px solid var(--amb);outline-offset:2px}
+.opts{display:grid;gap:8px;margin:12px 0}
+.opt{text-align:left;background:#0a1621;border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer}
+.opt.sel{border-color:var(--ice);background:#12344a}
+.opt:disabled{color:var(--ink);opacity:1;cursor:default}
+.fb{margin-top:12px;min-height:1.5em}
+.fb.ok,.info.ok b{color:var(--ok)}.fb.bad,.info.bad b{color:var(--bad)}
+.info{min-height:3.2em;background:#0a1621;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}
+.hint{color:var(--amb);margin-top:10px;font-size:.95rem}
+.row{display:grid;gap:4px;margin:10px 0}
+select{background:#0a1621;border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
+.list{display:grid;gap:10px;margin:14px 0}
+.list div{border-left:3px solid var(--ice);padding-left:12px}
+.up{animation:up .7s both}
+/* sala de rayos X */
+svg.room{width:100%;max-width:520px;display:block;margin:8px auto;border-radius:12px;background:none}
+[data-e]{cursor:pointer}[data-e]:hover{filter:brightness(1.3)}
+[data-e].found{filter:drop-shadow(0 0 6px #7be0ae)}
+/* esqueleto */
+:is(.scan,.skx) *{stroke:#cfeeff;stroke-linecap:round;stroke-width:3;fill:none}
+:is(.scan,.skx) .b{stroke-width:8}:is(.scan,.skx) .h{stroke-width:7}:is(.scan,.skx) .m{stroke-width:4.5}
+:is(.scan,.skx) .f{fill:#cfeeff;stroke-width:2}:is(.scan,.skx) .e{fill:#06121c;stroke:none}
+:is(.scan,.skx) .hit{stroke:transparent;stroke-width:22;pointer-events:stroke}
+.neg{background:#e4f1f8;border-radius:14px;padding:10px;max-width:300px;margin:8px auto}
+svg.skx{display:block;margin:0 auto;height:42vh;min-height:240px;max-height:360px;aspect-ratio:200/322;width:auto;max-width:100%;background:#04090f;border-radius:6px}
+.skx [data-b]{cursor:pointer}
+.skx [data-b]:hover *{stroke:var(--amb)}.skx [data-b]:hover .f{fill:var(--amb)}.skx [data-b]:hover .hit{stroke:transparent}
+/* presentación */
+.intro{text-align:center;padding-top:8px}
+.logo{display:block;height:52px;margin:0 auto 10px;background:#fff;padding:4px 8px;border-radius:10px;animation:up .8s both}
+.intro .tag{color:var(--mute);font-size:.9rem;animation:up .8s .1s both}
+.stage{position:relative;width:fit-content;margin:8px auto 4px}
+.stage::before{content:"";position:absolute;inset:6% -25%;background:radial-gradient(closest-side,rgba(159,227,255,.22),transparent);animation:breathe 4s ease-in-out infinite}
+svg.scan{position:relative;display:block;height:32vh;min-height:200px;max-height:300px;aspect-ratio:200/322;width:auto;max-width:none;margin:0;background:none;border-radius:0;filter:drop-shadow(0 0 10px rgba(159,227,255,.55));animation:reveal 3.2s linear .6s both}
+.beam{position:absolute;left:-12%;right:-12%;top:0;height:30px;transform:translateY(-100%);background:linear-gradient(rgba(159,227,255,0),rgba(159,227,255,.85));border-bottom:2px solid #fff;animation:sweep 3.2s linear .6s both,fade .5s 3.8s forwards}
+.wel{color:var(--amb);font-size:1.05rem;margin:10px 0 2px;animation:up .8s 1s both}
+.ttl{font-size:clamp(2.3rem,11vw,3.6rem);color:var(--ice);text-shadow:0 0 26px rgba(159,227,255,.45);margin:0 0 10px}
+.ttl i{font-style:normal;display:inline-block;animation:pop .55s both}
+.intro .story{max-width:30em;margin:0 auto 10px;animation:up .8s both}
+.intro .ask{color:var(--amb);font-weight:700;font-size:1.1rem}
+.btn.go{margin:8px 0 0;font-size:1.1rem;padding:14px 28px;animation:up .7s 4s both,pulse 2.2s 4.8s infinite}
+/* carta de la letra */
+.cw{animation:fadeIn .5s both;perspective:900px;display:grid;place-items:center;margin:12px 0 18px}
+.flip{position:relative;width:160px;height:215px;transform-style:preserve-3d;animation:spin 2s cubic-bezier(.3,.1,.2,1) .2s both}
+.face{position:absolute;inset:0;border-radius:16px;display:grid;place-items:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:2px solid var(--ice);background:linear-gradient(160deg,#12344a,#0a1621)}
+.front{align-content:center;justify-items:center}
+.front .q{font:700 3rem/1 Georgia,serif;color:var(--amb);margin-bottom:6px}
+.back{transform:rotateY(180deg);background:linear-gradient(160deg,#3a2a0a,#1a1204);border-color:var(--amb)}
+.back b{font:700 5.4rem/1 Georgia,serif;color:var(--amb);text-shadow:0 0 24px rgba(255,184,77,.6);animation:glow 1.6s 2.2s ease-in-out infinite}
+/* personajes */
+.bob{animation:bob .5s ease-in-out infinite}
+.lA,.aB{animation:swA .5s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 0}
+.lB,.aA{animation:swB .5s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 0}
+.still *{animation:none!important}
+.chars{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0}
+.pick{background:#0a1621;border:2px solid var(--line);border-radius:12px;padding:8px 4px 6px;cursor:pointer;display:grid;justify-items:center;gap:2px;color:var(--mute)}
+.pick.sel{border-color:var(--amb);background:#2a1d08;color:var(--ink)}
+.pick svg{width:80px;height:114px;max-width:none;display:block}
+input.nm{width:100%;font:inherit;color:var(--ink);background:#0a1621;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:4px}
+.hall{width:100%;max-width:440px;display:block;margin:4px auto 14px}
+.hall .av1{animation:walk1 3.4s ease-in-out .6s both}
+.hall .dp1{animation:open1 .9s ease-in-out 2.4s both;transform-box:fill-box;transform-origin:0 50%}
+@media(min-width:520px){.chars{grid-template-columns:repeat(4,1fr)}}
+/* final y festejo */
+.fin h1{font-size:2rem}
+.logoend{display:flex;flex-direction:column;align-items:center;gap:10px;margin:20px 0 8px;color:var(--ice);text-decoration:none;font-weight:700;text-align:center}
+.logoend img{height:60px;background:#fff;padding:5px 10px;border-radius:10px}
+.fx{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:9}
+.fx i{position:absolute;left:50%;top:45%;width:var(--w);height:var(--h);background:var(--c);border-radius:3px;animation:burst 1.9s cubic-bezier(.1,.7,.3,1) both}
+.fx .key{position:absolute;left:50%;top:45%;width:130px;height:130px;margin:-65px 0 0 -65px;animation:keyin 1.9s ease-out both;filter:drop-shadow(0 0 16px rgba(255,184,77,.85))}
+#app.turn{animation:turn 1.1s ease-in-out both}
+@keyframes bob{50%{transform:translateY(-2px)}}
+@keyframes swA{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes swB{from{transform:rotate(-24deg)}to{transform:rotate(24deg)}}
+@keyframes walk1{from{transform:translate(85px,158px);opacity:1}70%{transform:translate(285px,158px);opacity:1}90%,to{transform:translate(302px,158px);opacity:0}}
+@keyframes open1{to{transform:scaleX(.12)}}
+@keyframes up{from{opacity:0;transform:translateY(14px)}}
+@keyframes pop{from{opacity:0;transform:scale(.5) translateY(12px);filter:blur(6px)}}
+@keyframes reveal{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes sweep{from{top:0}to{top:100%}}
+@keyframes fade{to{opacity:0}}
+@keyframes breathe{50%{transform:scale(1.15);opacity:.65}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(159,227,255,.55)}50%{box-shadow:0 0 0 14px rgba(159,227,255,0)}}
+@keyframes spin{from{transform:rotateY(0) scale(.4)}to{transform:rotateY(540deg) scale(1)}}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes glow{50%{text-shadow:0 0 40px rgba(255,184,77,1)}}
+@keyframes burst{from{transform:translate(0,0) rotate(0) scale(.3);opacity:1}70%{opacity:1}to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+@keyframes keyin{0%{transform:scale(0) rotate(-180deg)}35%{transform:scale(1.25) rotate(20deg)}60%{transform:scale(1) rotate(0)}100%{transform:scale(1) rotate(360deg)}}
+@keyframes turn{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(.15);opacity:.2}100%{transform:rotate(360deg) scale(1)}}
+/* Solo se frenan los movimientos que se repiten; las animaciones de entrada se mantienen */
+@media(prefers-reduced-motion:reduce){.stage::before,.back b{animation:none}.btn.go{animation:up .7s 4s both}}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>const LOGO="data:image/png;base64,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";</script>
+<script>
+// ===== TEXTOS EDITABLES (se puede cambiar lo que está entre comillas) =====
+const LETRAS=["N","A","I","G","E","M"]; // una por desafío; en la puerta se ordenan: IMAGEN
+const CODIGO="IMAGEN";
+const TOTAL=LETRAS.length; // cantidad de desafíos
+const MSG=["¡Muy bien, conseguiste la letra!","¡Perfecto!","¡Excelente trabajo!","¡Eso es! Una letra más","¡Genial, sigamos!","¡Lo lograste! Ya las tenés todas"];
+const CONFIG={
+  titulo:"Código Roentgen",
+  bienvenida:"Bienvenidos/as a la sala",
+  carrera:"Licenciatura en Producción de Bioimágenes",
+  historia:["Estás de guardia 24 hs en un servicio de diagnóstico por imágenes y te quedaste encerrado/a.",
+            "El equipo de rayos X se apagó y necesitás reiniciarlo con un código para abrir la puerta."],
+  pregunta:"Resolvé los "+TOTAL+" desafíos, ¡tenés 5 minutos! ¿Podrás salir?",
+  boton:"Entrar a la sala",
+  puerta:"Conseguiste todas las letras. Ordenalas para formar la palabra que abre la puerta: es lo que se produce en un servicio de bioimágenes.",
+  logo:LOGO, // el logo ya viene incluido dentro de este archivo
+  link:"https://www.unpaz.edu.ar",
+  linkTexto:"Conocé la carrera en unpaz.edu.ar"
+};
+// ===========================================================================
+let step=0,got=[],t0=0,tFin=0,tm=null,door=[],sel=new Set(),found=new Set(),bone=0,ord=0,card=false,busy=false,solved=false,nombre="",ch=-1,perfil=false;
+const SKEL=`<g data-b="cráneo"><ellipse class="f" cx="100" cy="30" rx="22" ry="24"/><path class="f" d="M85 46h30v7q-15 9-30 0z"/><circle class="e" cx="91" cy="30" r="5.5"/><circle class="e" cx="109" cy="30" r="5.5"/><path class="e" d="M100 38l-3 7h6z"/></g><g data-b="columna"><line class="b" x1="100" y1="56" x2="100" y2="64"/><line class="b" x1="100" y1="64" x2="100" y2="152" style="stroke-width:10;stroke-dasharray:7 3;stroke-linecap:butt"/></g><g data-b="clavículas"><line class="m" x1="100" y1="67" x2="64" y2="73"/><line class="m" x1="100" y1="67" x2="136" y2="73"/></g><g data-b="costillas"><path d="M98 78Q72 77 75 91"/><path d="M102 78Q128 77 125 91"/><path d="M98 88Q67 87 70 101"/><path d="M102 88Q133 87 130 101"/><path d="M98 98Q66 97 69 111"/><path d="M102 98Q134 97 131 111"/><path d="M98 108Q70 107 73 121"/><path d="M102 108Q130 107 127 121"/><path d="M98 118Q76 117 79 131"/><path d="M102 118Q124 117 121 131"/><line class="m" x1="100" y1="76" x2="100" y2="112"/></g><g data-b="húmero"><line class="h" x1="62" y1="76" x2="50" y2="130"/><line class="h" x1="138" y1="76" x2="150" y2="130"/><line class="hit" x1="62" y1="76" x2="50" y2="130"/><line class="hit" x1="138" y1="76" x2="150" y2="130"/></g><g data-b="antebrazo"><line class="m" x1="50" y1="134" x2="42" y2="188"/><line class="m" x1="54" y1="134" x2="50" y2="188"/><line class="m" x1="150" y1="134" x2="158" y2="188"/><line class="m" x1="146" y1="134" x2="150" y2="188"/></g><g data-b="manos"><ellipse class="f" cx="44" cy="197" rx="6" ry="8"/><ellipse class="f" cx="156" cy="197" rx="6" ry="8"/></g><g data-b="pelvis"><path class="m" d="M76 152Q100 142 124 152Q134 170 114 178Q100 168 86 178Q66 170 76 152Z"/><circle class="f" cx="88" cy="174" r="6"/><circle class="f" cx="112" cy="174" r="6"/></g><g data-b="fémur"><line class="b" x1="88" y1="180" x2="84" y2="244"/><line class="b" x1="112" y1="180" x2="116" y2="244"/><line class="hit" x1="88" y1="180" x2="84" y2="244"/><line class="hit" x1="112" y1="180" x2="116" y2="244"/></g><g data-b="rótulas"><circle class="f" cx="84" cy="250" r="6.5"/><circle class="f" cx="116" cy="250" r="6.5"/></g><g data-b="tibia"><line class="h" x1="84" y1="258" x2="82" y2="306"/><line class="h" x1="116" y1="258" x2="118" y2="306"/><line class="t" x1="90" y1="258" x2="89" y2="304"/><line class="t" x1="110" y1="258" x2="111" y2="304"/></g><g data-b="pies"><ellipse class="f" cx="80" cy="312" rx="9" ry="4.5"/><ellipse class="f" cx="120" cy="312" rx="9" ry="4.5"/></g>`,TREF=`<svg viewBox="0 0 100 100" width="96" height="96" aria-hidden="true" style="fill:#ffb84d;stroke:none;background:none;max-width:none"><path d="M28.0 11.89A44 44 0 0 1 72.0 11.89L57.0 37.88A14 14 0 0 0 43.0 37.88Z"/><path d="M94.0 50.0A44 44 0 0 1 72.0 88.11L57.0 62.12A14 14 0 0 0 64.0 50.0Z"/><path d="M28.0 88.11A44 44 0 0 1 6.0 50.0L36.0 50.0A14 14 0 0 0 43.0 62.12Z"/><circle cx="50" cy="50" r="8"/></svg>`;
+const $=s=>document.querySelector(s),app=$("#app");
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+// ===== PERSONAJES (colores de ambo, piel y peinado) =====
+const CH=[
+ {n:"Celeste",a:"#5fb4e0",s:"#f1c6a0",h:"long",hc:"#3a2616"},
+ {n:"Verde",a:"#4fb286",s:"#c68b59",h:"short",hc:"#1d1712",x:"beard"},
+ {n:"Violeta",a:"#9b7be0",s:"#e0ac82",h:"cap",hc:"#d4c6fa"},
+ {n:"Coral",a:"#ef7a6b",s:"#8d5a3b",h:"curly",hc:"#2b1a10",x:"glasses"}
+];
+const av=c=>{
+ const hair={long:`<path d="M-10 -60Q-9 -71 0 -71Q9 -71 10 -60Q4 -65 -10 -60Z" fill="${c.hc}"/>`,
+  short:`<path d="M-10.5 -59Q-10 -72 0 -72Q10 -72 10.5 -59Q5 -65 -10.5 -59Z" fill="${c.hc}"/>`,
+  cap:`<path d="M-10.5 -60Q-10.5 -72 0 -72Q10.5 -72 10.5 -60Z" fill="${c.hc}"/><path d="M-10.5 -61H10.5" stroke="#9b7be0" stroke-width="2"/><circle cx="-4" cy="-67" r="1.3" fill="#9b7be0"/><circle cx="3" cy="-69" r="1.3" fill="#9b7be0"/><circle cx="6" cy="-64" r="1.2" fill="#9b7be0"/>`,
+  curly:[[-8,-64,5],[-3,-69,5.5],[3,-69,5.5],[8,-64,5],[0,-65,4]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="${p[2]}" fill="${c.hc}"/>`).join("")}[c.h];
+ const ex=c.x=="beard"?`<path d="M-8 -55Q-8 -47 0 -46Q8 -47 8 -55Q4 -51 0 -51Q-4 -51 -8 -55Z" fill="${c.hc}"/>`:c.x=="glasses"?`<circle cx="-3.8" cy="-57" r="3" fill="none" stroke="#2b2118" stroke-width="1"/><circle cx="3.8" cy="-57" r="3" fill="none" stroke="#2b2118" stroke-width="1"/><path d="M-0.8 -57H0.8" stroke="#2b2118" stroke-width="1"/>`:"";
+ return `<g class="bob">${c.h=="long"?`<rect x="-11" y="-66" width="22" height="26" rx="9" fill="${c.hc}"/>`:""}
+<rect class="lA" x="-8" y="-24" width="7" height="22" rx="2" fill="${c.a}"/><rect class="lB" x="1" y="-24" width="7" height="22" rx="2" fill="${c.a}"/>
+<rect class="lA" x="-9" y="-4" width="9" height="4" rx="2" fill="#e8f3fb"/><rect class="lB" x="0" y="-4" width="9" height="4" rx="2" fill="#e8f3fb"/>
+<rect class="aA" x="-17" y="-48" width="5" height="20" rx="2.5" fill="#f2f6f9"/><rect class="aB" x="12" y="-48" width="5" height="20" rx="2.5" fill="#f2f6f9"/>
+<rect x="-11" y="-48" width="22" height="26" rx="4" fill="${c.a}"/>
+<rect x="-13" y="-48" width="8" height="30" rx="2" fill="#f2f6f9"/><rect x="5" y="-48" width="8" height="30" rx="2" fill="#f2f6f9"/>
+<path d="M-3 -48L0 -39L3 -48" stroke="#ffb84d" stroke-width="1.5" fill="none"/><rect x="-3" y="-39" width="6" height="8" rx="1" fill="#ffb84d"/>
+<circle cx="0" cy="-58" r="10" fill="${c.s}"/>${hair}
+<circle cx="-3.5" cy="-57" r="1.2" fill="#2b2118"/><circle cx="3.5" cy="-57" r="1.2" fill="#2b2118"/><path d="M-3 -53Q0 -51 3 -53" stroke="#2b2118" stroke-width="1" fill="none"/>${ex}</g>`};
+const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+const secs=()=>Math.floor((Date.now()-t0)/1000);
+const tick=()=>{const e=$("#tm");if(e)e.textContent=fmt(secs())};
+const ART={"cráneo":"el cráneo","columna":"la columna vertebral","clavículas":"las clavículas","costillas":"las costillas","húmero":"el húmero","antebrazo":"los huesos del antebrazo","manos":"las manos","pelvis":"la pelvis","fémur":"el fémur","rótulas":"las rótulas","tibia":"la tibia y el peroné","pies":"los pies"};
+const NO="Esto no es equipamiento radiológico. Seguí buscando.";
+const OBJ={
+ neg:{ok:1,n:"Negatoscopio",t:"Pantalla de luz donde se colocan y observan las placas radiográficas para interpretarlas."},
+ bucky:{ok:1,n:"Bucky mural",t:"Soporte vertical que sostiene el chasis o detector. Sirve para radiografías con el paciente de pie, por ejemplo de tórax."},
+ tubo:{ok:1,n:"Torre con tubo de rayos X",t:"El tubo es la fuente que produce los rayos X, y la columna lo mueve para apuntar a la zona que se estudia."},
+ chal:{ok:1,n:"Chaleco plomado",t:"Contiene plomo y protege el cuerpo de la radiación dispersa."},
+ planta:{n:"Planta",t:NO},reloj:{n:"Reloj de pared",t:NO},taza:{n:"Taza de café",t:NO}
+};
+const hud=(slots=true,n=got.length)=>`<div class="hud"><span>🩻 ${CONFIG.titulo}</span><span id="tm">${fmt(secs())}</span></div>
+ <div class="bar"><i style="width:${n*100/TOTAL}%"></i></div>`+(slots?`<div class="slots" aria-label="Letras recogidas">${LETRAS.map((_,i)=>i<n&&got[i]?`<b class="on">${got[i]}</b>`:`<b>?</b>`).join("")}</div>`:"");
+const frame=(n,title,obj,body,hint)=>hud()+`<section class="card"><h2>Desafío ${n}: ${title}</h2><p class="obj">Objetivo: ${obj}</p>${body}
+ <div id="fb" class="fb" role="status"></div>${hint?`<button class="btn ghost" data-a="hint">💡 Pista</button><p id="hint" class="hint" hidden>${hint}</p>`:""}</section>`;
+function say(ok,msg){
+  if(solved&&!ok)return;
+  const f=$("#fb");f.className="fb "+(ok?"ok":"bad");f.textContent=msg;
+  if(ok){solved=true;document.querySelectorAll('[data-a="win"]').forEach(x=>x.remove());f.insertAdjacentHTML("afterend",`<button class="btn" data-a="win">Obtener la letra</button>`)}
+}
+const T4=[["Usa un campo magnético y ondas de radio, sin radiación ionizante","Resonancia magnética"],["Hace cortes del cuerpo con rayos X y una computadora","Tomografía computada"],["Usa rayos X de baja dosis para estudiar la mama","Mamografía"],["Imagen rápida de huesos con rayos X","Radiografía"],["Usa radiación de alta energía para tratar enfermedades como el cáncer","Radioterapia"]];
+const PASOS=["Recibir la orden médica y verificar la identidad del paciente","Posicionar al paciente, el chasis y el tubo de rayos X","Colocar la técnica en el comando","Realizar el disparo","Evaluar la calidad de la imagen"];
+
+const P=[
+ // 1
+ ()=>frame(1,"Radioprotección","Conocer la protección radiológica",
+  `<p>La puerta de la sala de rayos está señalizada. Elegí <b>los 3 elementos</b> que te corresponde ponerte antes de entrar.</p>
+  <div class="opts">${["Chaleco plomado","Auriculares","Dosímetro personal","Gorro de lana","Protector tiroideo","Guantes de cocina"].map((t,i)=>`<button class="opt" data-a="pick" data-i="${i}" aria-pressed="false">${t}</button>`).join("")}</div>
+  <button class="btn" data-a="check1">Comprobar</button>`,
+  "Pensá en qué frena la radiación, en qué la mide y en qué cuida una parte muy sensible del cuello."),
+ // 2
+ ()=>frame(2,"Sala de rayos X","Identificar elementos de la sala de rayos",
+  `<p>Esta sala tiene equipamiento de radiología… y algunos intrusos. Tocá los <b>4 elementos</b> propios de una sala de rayos X (<span id="cnt">0</span>/4).</p>
+  <svg class="room" viewBox="0 0 360 230" role="group" aria-label="Sala de rayos X con varios objetos">
+   <rect width="360" height="230" fill="#0b1824" rx="8"/><rect y="192" width="360" height="38" fill="#13283a"/><rect x="90" width="190" height="8" fill="#2c4a63"/>
+   <g data-e="neg" tabindex="0" role="button" aria-label="Objeto: pantalla de luz con una placa"><rect x="14" y="24" width="86" height="60" rx="4" fill="#cfd8de"/><rect x="20" y="30" width="74" height="48" fill="#e9f7ff"/><path d="M57 36v36M45 42h24M47 50h20M47 58h20M49 66h16" stroke="#9db3c2" stroke-width="3" fill="none"/></g>
+   <g data-e="reloj" tabindex="0" role="button" aria-label="Objeto: reloj"><circle cx="130" cy="40" r="15" fill="#e7e7e7" stroke="#555" stroke-width="3"/><path d="M130 40V30M130 40l7 4" stroke="#222" stroke-width="2" fill="none"/></g>
+   <g data-e="tubo" tabindex="0" role="button" aria-label="Objeto: columna con tubo"><polygon points="182,122 220,122 244,190 158,190" fill="rgba(255,230,120,.16)"/><rect x="196" y="8" width="10" height="62" fill="#6f8ea6"/><rect x="166" y="68" width="70" height="34" rx="10" fill="#8fb0c7"/><rect x="166" y="80" width="70" height="6" fill="#5d7f97"/><polygon points="176,102 226,102 220,122 182,122" fill="#46677f"/></g>
+   <g data-e="bucky" tabindex="0" role="button" aria-label="Objeto: soporte vertical con panel"><rect x="326" y="20" width="8" height="172" fill="#6f8ea6"/><rect x="294" y="60" width="38" height="100" rx="4" fill="#a9c3d6"/><path d="M294 84h38M294 110h38M294 136h38M313 60v100" stroke="#6f8ea6" stroke-width="2" fill="none"/></g>
+   <g data-e="chal" tabindex="0" role="button" aria-label="Objeto: prenda gris colgada"><rect x="48" y="104" width="4" height="88" fill="#6f8ea6"/><path d="M30 112L50 104L70 112L78 150L70 184L30 184L22 150Z" fill="#5d7f97" stroke="#9fc3dc" stroke-width="2"/><path d="M43 106q7 9 14 0" stroke="#9fc3dc" stroke-width="2" fill="none"/><text x="50" y="152" fill="#dff3ff" font-size="13" font-weight="700" text-anchor="middle">Pb</text></g>
+   <g data-e="taza" tabindex="0" role="button" aria-label="Objeto: mesa con taza"><rect x="104" y="168" width="52" height="6" fill="#7b5a3c"/><rect x="108" y="174" width="4" height="18" fill="#7b5a3c"/><rect x="148" y="174" width="4" height="18" fill="#7b5a3c"/><rect x="118" y="150" width="18" height="18" rx="3" fill="#e9e9e9"/><path d="M136 154h4q3 0 3 5t-3 5h-4" stroke="#e9e9e9" stroke-width="3" fill="none"/></g>
+   <g data-e="planta" tabindex="0" role="button" aria-label="Objeto: planta"><ellipse cx="260" cy="150" rx="6" ry="18" fill="#4caf7a"/><ellipse cx="250" cy="156" rx="5" ry="14" fill="#3f9a69" transform="rotate(-35 250 156)"/><ellipse cx="270" cy="156" rx="5" ry="14" fill="#3f9a69" transform="rotate(35 270 156)"/><path d="M246 192L254 168L272 168L280 192Z" fill="#b5651d"/></g>
+  </svg>
+  <div id="info" class="info" aria-live="polite">Tocá un objeto para ver qué es.</div>`,
+  "Buscá lo que sostiene la placa, lo que la ilumina, lo que produce los rayos y lo que protege a quien trabaja."),
+ // 3
+ ()=>frame(3,"Anatomía","Reconocer y ubicarse en la anatomía",
+  `<p>Hay un esqueleto proyectado en el negatoscopio. ${bone==0?"Tocá el <b>FÉMUR</b>.":"Ahora ubicá el <b>HÚMERO</b>."}</p>
+  <div class="neg"><svg class="skx" viewBox="0 0 200 322" role="img" aria-label="Esqueleto proyectado en el negatoscopio">${SKEL}</svg></div>`,
+  bone==0?"Es el hueso más largo del cuerpo y está en el muslo.":"Está en el brazo, entre el hombro y el codo."),
+ // 4
+ ()=>frame(4,"Diagnóstico por imágenes","Distinguir las técnicas de imagen",
+  `<p>Elegí qué técnica le corresponde a cada descripción.</p>
+  ${T4.map((r,i)=>`<div class="row"><label for="m${i}">${r[0]}</label><select id="m${i}"><option value="">Elegí…</option>${["Radiografía","Tomografía computada","Resonancia magnética","Mamografía","Radioterapia"].map(o=>`<option>${o}</option>`).join("")}</select></div>`).join("")}
+  <button class="btn" data-a="check4">Comprobar</button>`,
+  "Una no usa rayos X, y otra sirve para tratar en lugar de mostrar."),
+ // 5
+ ()=>frame(5,"Sala de espera","Atención al paciente",
+  `<p>Una persona mayor está esperando para hacerse una resonancia. Tiene las manos temblorosas y dice que le da miedo la máquina. ¿Qué hacés?</p>
+  <div class="opts">
+   <button class="opt" data-a="dil" data-i="0">Le explico con calma qué va a pasar y respondo sus dudas.</button>
+   <button class="opt" data-a="dil" data-i="1">Le digo que no es nada y que se apure, porque hay más gente esperando.</button>
+   <button class="opt" data-a="dil" data-i="2">Lo dejo para que lo resuelva el médico, no es mi tarea.</button></div>`,
+  "Un paciente que entiende lo que va a pasar se mueve menos, y eso mejora la imagen."),
+ // 6
+ ()=>frame(6,"Técnica radiológica","Seguir el procedimiento para realizar una radiografía",
+  `<p>Tenés que hacer una radiografía. Ordená los pasos a seguir tocándolos en el <b>orden correcto</b>.</p>
+  <div class="opts">${[3,0,4,1,2].map(i=>`<button class="opt" data-a="stp" data-i="${i}">${PASOS[i]}</button>`).join("")}</div>`,
+  "Primero se recibe la orden y se verifica al paciente. La imagen se evalúa al final."),
+ // puerta
+ ()=>hud(false,TOTAL)+`<section class="card"><h2>${CONFIG.titulo.toUpperCase()}</h2><p>${CONFIG.puerta}</p>
+  <div class="slots">${LETRAS.map((_,i)=>`<b class="${door[i]?"on":""}">${door[i]||"_"}</b>`).join("")}</div>
+  <div>${got.map(l=>`<button class="btn ghost" data-a="door" data-l="${l}" ${door.includes(l)?"disabled":""}>${l}</button>`).join("")}</div>
+  <div id="fb" class="fb" role="status"></div><button class="btn ghost" data-a="reset">Borrar</button></section>`,
+ // final
+ ()=>`<section class="card fin"><p class="obj">¡Saliste en ${fmt(tFin)}!</p><svg viewBox="-22 -78 44 82" width="70" height="100" aria-hidden="true" style="display:block;margin:0 auto 6px">${av(CH[ch])}</svg><h1 style="text-align:center">¡La puerta se abrió, ${esc(nombre)}!</h1>
+  <p>Ya podés salir y anotarte en la carrera <b>Licenciatura en Producción de Bioimágenes</b> en la UNPAZ. Esto es lo que te espera del otro lado:</p>
+  <div class="list">
+   <div><b>1.º año: las bases</b><br>Fundamentos de Radiología y Enfermería Radiológica, Anatomía y Fisiología, Física y Química. Lo que viste en los desafíos 1, 2 y 3.</div>
+   <div><b>2.º y 3.º año: las técnicas</b><br>Técnicas Radiológicas I y II, con prácticas de simulación y las materias con más carga horaria (12 horas semanales cada una), como en el desafío 6. Al terminar el 3.º tenés el título intermedio de Radiólogo/a Universitario/a.</div>
+   <div><b>4.º año: la alta complejidad</b><br>Resonancia Magnética, Tomografía Computada, Diagnóstico Mamario y Radioterapia. Lo del desafío 4.</div>
+   <div><b>Todo el camino: el trato con las personas</b><br>Deontología, Psicología y Bioética, como en el desafío 5.</div>
+   <div><b>5.º año: gestión y cierre</b><br>Liderazgo, Promoción de la Salud y Trabajo Final Integrador. Te recibís de Licenciado/a en Producción de Bioimágenes: son 28 materias y 2832 horas en total.</div>
+  </div>
+  <a class="logoend" href="${CONFIG.link}" target="_blank" rel="noopener"><img src="${CONFIG.logo}" alt="UNPAZ" onerror="this.remove()"><span>${CONFIG.linkTexto}</span></a>
+  <div style="text-align:center"><button class="btn ghost" data-a="restart">Jugar de nuevo</button></div></section>`
+];
+
+const perfilScreen=()=>`<section class="card"><h2>Armá tu perfil</h2><p class="obj">Elegí tu nombre y tu personaje para entrar a la sala.</p>
+ <label for="nm">¿Cómo te llamás? (puede ser un apodo)</label><input id="nm" class="nm" maxlength="20" autocomplete="off" value="${esc(nombre)}">
+ <p style="margin:16px 0 0">Elegí tu personaje</p>
+ <div class="chars">${CH.map((c,i)=>`<button class="pick${i==ch?" sel":""}" data-a="char" data-i="${i}" aria-pressed="${i==ch}" aria-label="Personaje ${c.n}"><svg class="still" viewBox="-22 -78 44 82">${av(c)}</svg><span>${c.n}</span></button>`).join("")}</div>
+ <div id="fb" class="fb bad" role="status"></div><button class="btn" data-a="go">Empezar</button></section>`;
+
+const hall=()=>{const n=step,fin=n>=TOTAL;return `<svg class="hall" viewBox="0 36 380 154" role="img" aria-label="${esc(nombre)} camina hacia la puerta de la siguiente sala">
+ <rect y="36" width="380" height="154" rx="12" fill="#0b1824"/><rect y="158" width="380" height="32" fill="#13283a"/><path d="M96 122H274" stroke="#27445c" stroke-width="3" stroke-linecap="round" fill="none"/>
+ <rect x="24" y="60" width="56" height="90" rx="3" fill="#1b3a52"/><rect x="28" y="64" width="48" height="86" fill="#3d6a8c"/>
+ <rect x="40" y="46" width="24" height="11" rx="2" fill="#1b3a52"/><text x="52" y="55.5" text-anchor="middle" font-size="11" fill="#9fe3ff">${n}</text>
+ <rect x="290" y="60" width="56" height="90" rx="3" fill="#1b3a52"/><rect x="294" y="64" width="48" height="86" fill="#f6d98a"/><rect class="dp1" x="294" y="64" width="48" height="86" fill="#3d6a8c"/>
+ <rect x="306" y="46" width="24" height="11" rx="2" fill="#1b3a52"/><text x="318" y="55.5" text-anchor="middle" font-size="11" fill="#9fe3ff">${fin?"🔑":n+1}</text>
+ <text x="52" y="178" text-anchor="middle" font-size="12" fill="#8fa8bb">Sala ${n}</text><text x="318" y="178" text-anchor="middle" font-size="12" fill="#8fa8bb">${fin?"Puerta":"Sala "+(n+1)}</text>
+ <g class="av1">${av(CH[ch])}</g></svg>`};
+
+const cardScreen=()=>hud(true,got.length-1)+`<section class="card" style="text-align:center">
+ <div class="cw"><div class="flip"><div class="face front"><span class="q">?</span>${TREF}</div><div class="face back"><b>${got[got.length-1]}</b></div></div></div>
+ ${hall()}
+ <h2 class="up" style="animation-delay:2s">${MSG[got.length-1]}</h2>
+ <p class="up" style="animation-delay:2.15s">${esc(nombre)}, conseguiste la letra <b>${got[got.length-1]}</b>. Ya tenés ${got.length} de ${TOTAL}.</p>
+ <button class="btn up" style="animation-delay:2.3s" data-a="next">${got.length==TOTAL?"Ir a la puerta":"Pasar a la siguiente sala"} →</button></section>`;
+
+function render(){
+  if(step==0&&perfil){app.innerHTML=perfilScreen();window.scrollTo(0,0);return}
+  if(step==0){
+    const T=CONFIG.titulo.split("").map((c,i)=>`<i style="animation-delay:${1.2+i*.05}s">${c==" "?"&nbsp;":c}</i>`).join("");
+    app.innerHTML=`<section class="intro">
+    <img class="logo" src="${CONFIG.logo}" alt="Logo UNPAZ" onerror="this.remove()">
+    <p class="tag">${CONFIG.carrera}</p>
+    <div class="stage"><svg class="scan" viewBox="0 0 200 322" role="img" aria-label="Un esqueleto que aparece al pasar un haz de rayos X">${SKEL}</svg><div class="beam"></div></div>
+    <p class="wel">${CONFIG.bienvenida}</p>
+    <h1 class="ttl" aria-label="${CONFIG.titulo}"><span aria-hidden="true">${T}</span></h1>
+    ${CONFIG.historia.map((t,i)=>`<p class="story" style="animation-delay:${2.4+i*.5}s">${t}</p>`).join("")}
+    <p class="story ask" style="animation-delay:${2.4+CONFIG.historia.length*.5}s">${CONFIG.pregunta}</p>
+    <button class="btn go" data-a="start">${CONFIG.boton}</button></section>`;return}
+  app.innerHTML=card?cardScreen():P[step-1]();
+  window.scrollTo(0,0);
+}
+
+function fx(){
+  const d=document.createElement("div");d.className="fx";
+  const C=["#9fe3ff","#ffb84d","#7be0ae","#ff8a80","#ffffff","#c79bff"],W=innerWidth<500?170:380;
+  let h=`<svg class="key" viewBox="0 0 64 64" aria-hidden="true" style="background:none;max-width:none"><circle cx="20" cy="32" r="13" fill="none" stroke="#ffb84d" stroke-width="6"/><rect x="33" y="29" width="27" height="6" fill="#ffb84d"/><rect x="47" y="35" width="5" height="10" fill="#ffb84d"/><rect x="56" y="35" width="4" height="7" fill="#ffb84d"/></svg>`;
+  for(let i=0;i<90;i++){const a=Math.random()*6.283,r=110+Math.random()*W;
+    h+=`<i style="--c:${C[i%6]};--dx:${Math.cos(a)*r}px;--dy:${Math.sin(a)*r+150}px;--r:${Math.random()*900-450}deg;--w:${3+Math.random()*5}px;--h:${14+Math.random()*44}px;animation-delay:${Math.random()*.3}s"></i>`}
+  d.innerHTML=h;document.body.appendChild(d);setTimeout(()=>d.remove(),2700);
+}
+
+app.addEventListener("click",e=>{
+  const b=e.target.closest("[data-a],[data-b],[data-e]");if(!b)return;
+  if(b.dataset.e){ // desafío 2
+    if(step!=2||card)return;
+    const k=b.dataset.e,o=OBJ[k],i=$("#info");
+    i.className="info "+(o.ok?"ok":"bad");i.innerHTML="<b>"+o.n+"</b><br>"+o.t;
+    if(o.ok){found.add(k);b.classList.add("found");$("#cnt").textContent=found.size;
+      if(found.size==4)say(true,"¡Encontraste los 4 elementos de la sala de rayos X!")}
+    return}
+  if(b.dataset.b){ // desafío 3
+    if(step!=3||card||bone>=2)return;
+    const w=["fémur","húmero"][bone],k=b.dataset.b;
+    if(k==w){bone++;
+      if(bone==2)say(true,"¡Correcto! El húmero es el hueso del brazo, entre el hombro y el codo. Ubicaste los dos.");
+      else{render();const f=$("#fb");f.className="fb ok";f.textContent="¡Correcto! El fémur es el hueso más largo y fuerte del cuerpo. Ahora buscá el húmero."}}
+    else say(false,"Ahí tocaste "+ART[k]+". Buscá el "+w+".");
+    return}
+  const a=b.dataset.a;
+  if(a=="start"){perfil=true;render()}
+  else if(a=="char"){ch=+b.dataset.i;$("#fb").textContent="";document.querySelectorAll(".pick").forEach((x,i)=>{x.classList.toggle("sel",i==ch);x.setAttribute("aria-pressed",i==ch)})}
+  else if(a=="go"){const v=$("#nm").value.trim(),f=$("#fb");
+    if(!v){f.textContent="Escribí tu nombre (puede ser un apodo).";$("#nm").focus();return}
+    if(ch<0){f.textContent="Elegí un personaje.";return}
+    nombre=v;perfil=false;step=1;t0=Date.now();clearInterval(tm);tm=setInterval(tick,1000);render()}
+  else if(a=="hint"){const h=$("#hint");h.hidden=!h.hidden}
+  else if(a=="win"){got.push(LETRAS[step-1]);card=true;render()}
+  else if(a=="next"){card=false;step++;sel=new Set();found=new Set();bone=0;ord=0;solved=false;render()}
+  else if(a=="pick"){const i=+b.dataset.i;sel.has(i)?sel.delete(i):sel.add(i);b.classList.toggle("sel");b.setAttribute("aria-pressed",sel.has(i))}
+  else if(a=="check1"){
+    if(sel.size==3&&[0,2,4].every(i=>sel.has(i)))say(true,"Correcto. El chaleco bloquea la radiación, el dosímetro la mide y el protector tiroideo cuida la tiroides.");
+    else say(false,"Todavía no. Elegí exactamente 3: uno que bloquee la radiación, uno que la mida y uno que proteja el cuello.")}
+  else if(a=="check4"){const v=T4.map((_,i)=>$("#m"+i).value),n=v.filter((x,i)=>x!=T4[i][1]).length;
+    if(n==0)say(true,"Perfecto. Cada técnica tiene su función, y vas a aprender a manejar las de alta complejidad.");
+    else say(false,"Hay "+n+" que no coinciden. Fijate cuál no usa rayos X y cuál sirve para tratar, no para ver.")}
+  else if(a=="dil"){if(b.dataset.i=="0")say(true,"Eso es. Explicar y escuchar calma al paciente y ayuda a que la imagen salga bien.");
+    else say(false,b.dataset.i=="1"?"Apurar a alguien con miedo lo pone más tenso y suele arruinar el estudio. Probá otra opción.":"El trato con el paciente es parte de tu trabajo, no solo del médico. Probá otra opción.")}
+  else if(a=="stp"){const i=+b.dataset.i;
+    if(i==ord){b.classList.add("sel");b.disabled=true;b.textContent=(i+1)+". "+b.textContent;ord++;
+      if(ord==5)say(true,"Perfecto. Así se trabaja en Técnicas Radiológicas, la materia con más horas de la carrera.");
+      else{const f=$("#fb");f.className="fb ok";f.textContent="Bien. ¿Qué sigue?"}}
+    else say(false,"Todavía no. Pensá qué hay que hacer antes de ese paso.")}
+  else if(a=="door"){if(busy)return;door.push(b.dataset.l);render();
+    if(door.length==TOTAL){
+      if(door.join("")==CODIGO){busy=true;clearInterval(tm);tFin=secs();fx();
+        setTimeout(()=>app.classList.add("turn"),1700);
+        setTimeout(()=>{step=TOTAL+2;render()},2250);
+        setTimeout(()=>{app.classList.remove("turn");busy=false},2900)}
+      else{$("#fb").className="fb bad";$("#fb").textContent="Ese no es el código. Probá de nuevo.";door=[];setTimeout(render,900)}}}
+  else if(a=="reset"){door=[];render()}
+  else if(a=="restart"){clearInterval(tm);perfil=false;step=0;got=[];door=[];sel=new Set();found=new Set();bone=0;ord=0;card=false;busy=false;solved=false;render()}
+});
+app.addEventListener("keydown",e=>{
+  if((e.key=="Enter"||e.key==" ")&&e.target.dataset&&e.target.dataset.e){e.preventDefault();e.target.dispatchEvent(new MouseEvent("click",{bubbles:true}))}
+});
+render();
+</script>
+</body>
+</html>
